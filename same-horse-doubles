@@ -1,0 +1,42 @@
+name: Update same-horse doubles
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: Build the results page
+        env:
+          LADS_API_KEY: ${{ secrets.LADS_API_KEY }}
+        run: python build_doubles_page.py
+
+      - name: Commit and push the updated page
+        run: |
+          git config user.name "doubles-bot"
+          git config user.email "doubles-bot@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "No change in the page; nothing to commit."
+          else
+            git commit -m "Update same-horse doubles"
+            git push
+          fi
