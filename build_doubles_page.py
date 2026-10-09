@@ -102,6 +102,7 @@ def scan(countries, correlation, workers):
             impossible = (fair == float("inf"))
             row = {
                 "horse": today["name"],
+                "today_time": today["time"],          # "HH:MM" — used for sorting
                 "today_race": f"{today['time']} {today['race']}",
                 "today_price": round(today["price"], 2),
                 "antepost_race": ap_name,
@@ -114,8 +115,9 @@ def scan(countries, correlation, workers):
                                              else round(apply_margin(fair, tier), 2))
             rows.append(row)
 
-    rows.sort(key=lambda x: (x["fair_price"] is None,
-                             x["fair_price"] if x["fair_price"] is not None else 0))
+    # Sort chronologically by today's race time (earliest first); the horse
+    # name breaks ties so two runners in the same race stay grouped.
+    rows.sort(key=lambda x: (x["today_time"], x["horse"].lower()))
     return rows
 
 
@@ -145,7 +147,7 @@ def build_html(rows, countries, correlation):
     if rows:
         table = (
             f"<p class='count'>{len(rows)} same-horse double(s) found "
-            f"&middot; sorted by shortest true price</p>"
+            f"&middot; in race-time order for today</p>"
             "<table>"
             "<colgroup>"
             "<col class='c-horse'><col class='c-trace'><col class='c-tp'>"
@@ -193,7 +195,7 @@ def build_html(rows, countries, correlation):
   tr:last-child td {{ border-bottom:none; }}
   td.horse {{ font-weight:700; }}
   td.ap {{ color:#334155; }}
-  .num {{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }}
+  .num {{ text-align:left; font-variant-numeric:tabular-nums; white-space:nowrap; }}
   .fair {{ font-weight:700; }}
   footer {{ padding:0 20px 30px; font-size:12px; color:var(--muted); }}
 </style>
