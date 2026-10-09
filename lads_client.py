@@ -271,9 +271,29 @@ class LadsClient:
     def _get(self, path: str, **params):
         url = f"{BASE_URL}{path}"
         all_params = {"api-key": self.api_key, "locale": LOCALE, **params}
-        resp = requests.get(url, params=all_params, headers=HEADERS, timeout=TIMEOUT)
-        resp.raise_for_status()
-        return resp.json()
+        # Ladbrokes sits behind Cloudflare, which sometimes returns a transient
+        # 403/429 for requests from datacentre IPs (e.g. GitHub Actions runners).
+        # Retry a few times with a growing pause before giving up, so an
+        # occasional block doesn't fail the whole run.
+        attempts = 4
+        last_exc = None
+        for i in range(attempts):
+            try:
+                resp = requests.get(url, params=all_params, headers=HEADERS,
+                                    timeout=TIMEOUT)
+                if resp.status_code in (403, 429, 503) and i < attempts - 1:
+                    time.sleep(3 * (i + 1))   # 3s, 6s, 9s backoff
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except requests.RequestException as exc:
+                last_exc = exc
+                if i < attempts - 1:
+                    time.sleep(3 * (i + 1))
+                    continue
+                raise
+        if last_exc:
+            raise last_exc
 
     # ── Events ──
 
