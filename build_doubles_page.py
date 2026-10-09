@@ -72,6 +72,9 @@ def scan(countries, correlation, workers):
     """Return a list of priced same-horse-double rows, sorted shortest fair first."""
     client = LadsClient()
 
+    # Today's date (UK), shown with each race so the day is never ambiguous.
+    today_str = datetime.now(UK_TZ).strftime("%a %d %b %Y")
+
     _log(f"Discovering ante-post feature races ({workers} workers)...")
     antepost = client.discover_antepost_events(max_workers=workers)
     _log(f"Ante-post markets found: {len(antepost)}")
@@ -100,15 +103,19 @@ def scan(countries, correlation, workers):
                 labels=(today["name"], r["name"]))
             fair = result.fair_price
             impossible = (fair == float("inf"))
+            today_race = f"{today['time']} {today['race']} ({today_str})"
             row = {
                 "horse": today["name"],
                 "today_time": today["time"],          # "HH:MM" — used for sorting
-                "today_race": f"{today['time']} {today['race']}",
+                "today_race": today_race,
                 "today_price": round(today["price"], 2),
                 "antepost_race": ap_name,
                 "antepost_price": round(r["price_decimal"], 2),
                 "fair_prob_pct": round(result.fair_prob * 100, 2),
                 "fair_price": None if impossible else round(fair, 2),
+                # Ready-to-copy phrase, e.g.
+                # "Beagle Bay to win the 13:30 York and Balmoral Handicap"
+                "copy_text": f"{today['name']} to win the {today_race} and {ap_name}",
             }
             for tier in MARGIN_TIERS:
                 row[f"quote_{int(tier)}"] = (None if impossible
