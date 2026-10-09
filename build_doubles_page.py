@@ -69,7 +69,7 @@ def gather_todays_runners(client, wanted, countries, workers):
 
 
 def scan(countries, correlation, workers):
-    """Return a list of priced same-horse-double rows, sorted shortest fair first."""
+    """Return a list of priced same-horse-double rows, in race-time order."""
     client = LadsClient()
 
     # Today's date (UK), shown with each race so the day is never ambiguous.
@@ -114,7 +114,7 @@ def scan(countries, correlation, workers):
                 "fair_prob_pct": round(result.fair_prob * 100, 2),
                 "fair_price": None if impossible else round(fair, 2),
                 # Ready-to-copy phrase, e.g.
-                # "Beagle Bay to win the 13:30 York and Balmoral Handicap"
+                # "Beagle Bay to win the 13:30 York (Thu 09 Oct 2026) and Balmoral Handicap"
                 "copy_text": f"{today['name']} to win the {today_race} and {ap_name}",
             }
             for tier in MARGIN_TIERS:
@@ -137,8 +137,19 @@ def build_html(rows, countries, correlation):
 
     body_rows = ""
     for r in rows:
+        copy_text = r["copy_text"]
+        # The Bet column: the ready-to-copy phrase plus a one-click Copy button.
+        bet_cell = (
+            "<td class='bet'>"
+            f"<span class='bettext'>{esc(copy_text)}</span>"
+            f"<button class='copybtn' type='button' "
+            f"data-copy=\"{esc(copy_text, quote=True)}\" "
+            f"onclick='copyBet(this)'>Copy</button>"
+            "</td>"
+        )
         body_rows += (
             "<tr>"
+            + bet_cell +
             f"<td class='horse'>{esc(r['horse'])}</td>"
             f"<td>{esc(r['today_race'])}</td>"
             f"<td class='num'>{cell(r['today_price'])}</td>"
@@ -157,11 +168,13 @@ def build_html(rows, countries, correlation):
             f"&middot; in race-time order for today</p>"
             "<table>"
             "<colgroup>"
+            "<col class='c-bet'>"
             "<col class='c-horse'><col class='c-trace'><col class='c-tp'>"
             "<col class='c-ap'><col class='c-app'><col class='c-fair'>"
             "<col class='c-q'><col class='c-q'><col class='c-q'>"
             "</colgroup>"
             "<thead><tr>"
+            "<th>Bet (copy)</th>"
             "<th>Horse</th><th>Today's race</th><th>Today</th>"
             "<th>Ante-post race</th><th>A-P</th>"
             "<th>True price</th><th>25%</th><th>50%</th><th>75%</th>"
@@ -204,6 +217,12 @@ def build_html(rows, countries, correlation):
   td.ap {{ color:#334155; }}
   .num {{ text-align:left; font-variant-numeric:tabular-nums; white-space:nowrap; }}
   .fair {{ font-weight:700; }}
+  td.bet {{ white-space:normal; min-width:230px; }}
+  .bettext {{ display:block; font-size:12.5px; color:#06324a; margin-bottom:4px; }}
+  .copybtn {{ background:var(--blue); color:#063047; border:none; border-radius:6px;
+             padding:4px 10px; font-size:12px; font-weight:600; cursor:pointer; }}
+  .copybtn:hover {{ filter:brightness(0.96); }}
+  .copybtn.copied {{ background:#8ed081; }}
   footer {{ padding:0 20px 30px; font-size:12px; color:var(--muted); }}
 </style>
 </head>
@@ -221,6 +240,28 @@ def build_html(rows, countries, correlation):
   cards &amp; prices from the Ladbrokes feed. True price is the fair (0% margin)
   double; 25/50/75% are margin-added quotes. Matching is by exact horse name.
 </footer>
+<script>
+function copyBet(btn) {{
+  var text = btn.getAttribute('data-copy');
+  function done() {{
+    var old = btn.textContent;
+    btn.textContent = 'Copied';
+    btn.classList.add('copied');
+    setTimeout(function () {{ btn.textContent = old; btn.classList.remove('copied'); }}, 1200);
+  }}
+  function fallback(t) {{
+    var ta = document.createElement('textarea');
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    try {{ document.execCommand('copy'); }} catch (e) {{}}
+    document.body.removeChild(ta);
+  }}
+  if (navigator.clipboard && navigator.clipboard.writeText) {{
+    navigator.clipboard.writeText(text).then(done, function () {{ fallback(text); done(); }});
+  }} else {{
+    fallback(text); done();
+  }}
+}}
+</script>
 </body>
 </html>
 """
